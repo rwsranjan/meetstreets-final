@@ -293,6 +293,19 @@ function InfoRow({ icon, label, value }) {
     </div>
   );
 }
+export async function getServerSideProps(context) {
+  const { userId } = context.params;
+
+  if (!userId) {
+    return { notFound: true };
+  }
+
+  return {
+    props: {
+      userId
+    }
+  };
+}
 
 
 // ⏳ Remaining (17 pages):
