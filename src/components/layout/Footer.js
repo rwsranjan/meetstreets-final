@@ -4,14 +4,14 @@ import { MapPin, Twitter, Instagram, Facebook, Linkedin, Heart } from "lucide-re
 
 export default function Footer() {
   return (
-    <footer className="bg-linear-to-b from-gray-950 to-black border-t border-orange-900/20 text-gray-400">
+    <footer className="bg-gradient-to-b from-gray-950 to-black border-t border-orange-900/20 text-gray-400">
       <div className="mx-auto max-w-7xl px-5 sm:px-6 lg:px-8">
         {/* Main footer content */}
         <div className="grid grid-cols-2 gap-8 py-12 md:grid-cols-4 lg:grid-cols-5 lg:gap-12">
           {/* Brand & short description */}
           <div className="col-span-2 md:col-span-1 lg:col-span-2">
             <Link href="/" className="flex items-center gap-2.5 mb-4">
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-linear-to-br from-orange-500 via-amber-500 to-yellow-500 text-white font-bold text-lg shadow-md">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 via-amber-500 to-yellow-500 text-white font-bold text-lg shadow-md">
                 MS
               </div>
               <span className="text-xl font-bold tracking-tight text-white">
@@ -33,8 +33,8 @@ export default function Footer() {
             <ul className="space-y-3 text-sm">
               <li><Link href="/nearby" className="hover:text-orange-400 transition-colors">Nearby People</Link></li>
               <li><Link href="/events" className="hover:text-orange-400 transition-colors">Events</Link></li>
-              <li><Link href="/search" className="hover:text-orange-400 transition-colors">Search & Discover</Link></li>
-              <li><Link href="/create" className="hover:text-orange-400 transition-colors">Create Event</Link></li>
+              <li><Link href="/explore" className="hover:text-orange-400 transition-colors">Search & Discover</Link></li>
+              <li><Link href="/events/create" className="hover:text-orange-400 transition-colors">Create Event</Link></li>
             </ul>
           </div>
 
@@ -87,7 +87,7 @@ export default function Footer() {
             <Link href="/privacy" className="hover:text-orange-400 transition-colors">Privacy Policy</Link>
             <Link href="/terms" className="hover:text-orange-400 transition-colors">Terms of Service</Link>
             <Link href="/cookies" className="hover:text-orange-400 transition-colors">Cookie Policy</Link>
-            <span className="text-gray-600">Made in Jaipur 🏜️</span>
+            <span className="text-gray-600">Made in India 🇮🇳</span>
           </div>
         </div>
       </div>
