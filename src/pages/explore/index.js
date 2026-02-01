@@ -26,7 +26,7 @@ export default function Explore() {
   const loadUsers = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('/api/search/profiles', {
+      const res = await fetch('/api/search/profile', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

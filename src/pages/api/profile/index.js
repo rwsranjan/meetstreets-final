@@ -18,7 +18,7 @@ export default async function handler(req, res) {
     }
 
     const { userId } = req.query;
-
+console.log(userId)
     // If userId is provided, get that user's profile, otherwise get own profile
     const targetUserId = userId || user.userId;
 
@@ -32,14 +32,19 @@ export default async function handler(req, res) {
     }
 
     // Hide sensitive info if viewing someone else's profile
-    if (userId && userId !== user.userId) {
-      delete profile.linkedWallet;
-      delete profile.email;
-      delete profile.mobile;
-      delete profile.address.street;
-      delete profile.address.pincode;
-      delete profile.address.coordinates;
-    }
+   // Hide sensitive info if viewing someone else's profile
+if (userId && userId !== user.userId) {
+  delete profile.linkedWallet;
+  delete profile.email;
+  delete profile.mobile;
+
+  if (profile.address) {
+    delete profile.address.street;
+    delete profile.address.pincode;
+    delete profile.address.coordinates;
+  }
+}
+
 
     res.status(200).json({ profile });
   } catch (error) {

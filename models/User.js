@@ -100,10 +100,13 @@ const userSchema = new mongoose.Schema(
         "travel-companion"
       ]
     },
-    wantKids: {
-      type: String,
-      enum: ["yes", "no", "maybe", "have-kids"]
-    },
+  wantKids: {
+  type: String,
+  enum: ["yes", "no", "maybe", "have-kids"],
+  default: null,
+  set: v => v === '' ? null : v  // <-- this converts "" to null automatically
+},
+
 
     // =====================
     // Lifestyle
