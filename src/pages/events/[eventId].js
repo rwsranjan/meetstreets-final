@@ -1,6 +1,8 @@
 // app/events/[eventId]/page.jsx
 "use client";
 
+ 
+export const dynamic = 'force-dynamic';
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation'; 
 import { 
@@ -15,12 +17,15 @@ export default function EventDetails() {
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const currentUserId = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}')._id : null;
+ const eventId = params?.eventId;
 
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) router.push('/login');
-    else loadEvent();
-  }, [params.eventId]);
+useEffect(() => {
+  if (!eventId) return;
+
+  const token = localStorage.getItem('token');
+  if (!token) router.push('/login');
+  else loadEvent();
+}, [eventId]);
 
   const loadEvent = async () => {
     try {

@@ -1,5 +1,6 @@
 // app/meetings/[meetingId]/page.jsx
 "use client";
+export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation'; 
@@ -15,17 +16,21 @@ export default function MeetingDetails() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const currentUserId = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user') || '{}')._id : null;
+ const meetingId = params?.meetingId;
 
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) router.push('/login');
-    else loadMeeting();
-  }, [params.meetingId]);
+useEffect(() => {
+  if (!meetingId) return;
+
+  const token = localStorage.getItem('token');
+  if (!token) router.push('/login');
+  else loadMeeting();
+}, [meetingId]);
+
 
   const loadMeeting = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`/api/meeting/${params.meetingId}`, {
+      const res = await fetch(`/api/meeting/${meetingId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
