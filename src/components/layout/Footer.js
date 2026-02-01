@@ -34,6 +34,7 @@ export default function Footer() {
               <li><Link href="/nearby" className="hover:text-orange-400 transition-colors">Nearby People</Link></li>
                <li><Link href="/explore" className="hover:text-orange-400 transition-colors">Search & Discover</Link></li>
               <li><Link href="/events" className="hover:text-orange-400 transition-colors">Create Event</Link></li>
+              <li><Link href="/events/all" className="hover:text-orange-400 transition-colors">All Event</Link></li>
             </ul>
           </div>
 

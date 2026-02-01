@@ -1,5 +1,6 @@
 // app/messages/[conversationId]/page.jsx
 "use client";
+export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
@@ -20,7 +21,8 @@ import { useSocket } from "../../hooks/useSocket";
 
 export default function ChatWindow() {
   const router = useRouter();
-  const { conversationId } = useParams();
+const params = useParams();
+const conversationId = params?.conversationId;
 
   const { joinRoom, sendMessage, onMessage, startCall } = useSocket();
 
