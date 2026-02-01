@@ -56,7 +56,7 @@ export default function Header() {
                 </Link>
 
                 <Link
-                  href="/events/create"
+                  href="/events"
                   className="rounded-full bg-gradient-to-r from-orange-600 to-amber-600 px-6 py-2.5 text-sm font-semibold text-white shadow-md shadow-orange-600/25 hover:from-orange-500 hover:to-amber-500 hover:shadow-orange-600/40 transition-all"
                 >
                   Create Event

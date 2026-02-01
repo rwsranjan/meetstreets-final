@@ -32,9 +32,8 @@ export default function Footer() {
             <h3 className="text-sm font-semibold text-gray-200 mb-4">Product</h3>
             <ul className="space-y-3 text-sm">
               <li><Link href="/nearby" className="hover:text-orange-400 transition-colors">Nearby People</Link></li>
-              <li><Link href="/events" className="hover:text-orange-400 transition-colors">Events</Link></li>
-              <li><Link href="/explore" className="hover:text-orange-400 transition-colors">Search & Discover</Link></li>
-              <li><Link href="/events/create" className="hover:text-orange-400 transition-colors">Create Event</Link></li>
+               <li><Link href="/explore" className="hover:text-orange-400 transition-colors">Search & Discover</Link></li>
+              <li><Link href="/events" className="hover:text-orange-400 transition-colors">Create Event</Link></li>
             </ul>
           </div>
 

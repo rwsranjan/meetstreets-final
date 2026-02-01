@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-  import { Camera, Edit, Save, X } from 'lucide-react';
+ import { Camera, Edit, Save, X, MapPin, Heart, Briefcase } from 'lucide-react';
 
 export default function MyProfile() {
   const router = useRouter();
@@ -52,7 +52,6 @@ export default function MyProfile() {
         const data = await res.json();
         setUser(data.user);
         setEditing(false);
-        // Update localStorage
         localStorage.setItem('user', JSON.stringify(data.user));
       }
     } catch (error) {
@@ -78,7 +77,7 @@ export default function MyProfile() {
             {!editing ? (
               <button
                 onClick={() => setEditing(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600"
+                className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
               >
                 <Edit size={18} />
                 Edit Profile
@@ -86,18 +85,21 @@ export default function MyProfile() {
             ) : (
               <div className="flex gap-2">
                 <button
-                  onClick={() => setEditing(false)}
-                  className="flex items-center gap-2 px-4 py-2 border border-gray-700 text-gray-300 rounded-lg hover:bg-gray-800"
+                  onClick={() => {
+                    setEditing(false);
+                    setFormData(user);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-700 text-gray-300 rounded-lg hover:bg-gray-800 transition-colors"
                 >
                   <X size={18} />
                   Cancel
                 </button>
                 <button
                   onClick={handleSave}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                 >
                   <Save size={18} />
-                  Save
+                  Save Changes
                 </button>
               </div>
             )}
@@ -107,16 +109,33 @@ export default function MyProfile() {
             {/* Profile Header */}
             <div className="h-48 bg-gradient-to-br from-orange-500 to-amber-500 relative">
               <div className="absolute -bottom-16 left-8">
-                <div className="w-32 h-32 rounded-full bg-gradient-to-br from-orange-500 to-amber-500 border-4 border-gray-900 flex items-center justify-center text-white text-4xl font-bold">
+                <div className="w-32 h-32 rounded-full bg-gradient-to-br from-orange-500 to-amber-500 border-4 border-gray-900 flex items-center justify-center text-white text-4xl font-bold shadow-xl">
                   {user?.profileName?.charAt(0)}
                 </div>
-                <button className="absolute bottom-0 right-0 p-2 bg-gray-900 rounded-full border-2 border-gray-800 hover:border-orange-500">
+                <button className="absolute bottom-0 right-0 p-2 bg-gray-900 rounded-full border-2 border-gray-800 hover:border-orange-500 transition-colors">
                   <Camera size={18} className="text-gray-400" />
                 </button>
               </div>
             </div>
 
             <div className="pt-20 p-8">
+              {/* Stats Row */}
+              <div className="grid grid-cols-3 gap-4 mb-8">
+                <div className="text-center p-4 bg-gray-800/50 rounded-lg">
+                  <div className="text-2xl font-bold text-orange-400">{user?.coins || 0}</div>
+                  <div className="text-sm text-gray-400">Coins</div>
+                </div>
+                <div className="text-center p-4 bg-gray-800/50 rounded-lg">
+                  <div className="text-2xl font-bold text-green-400">{user?.meetsPerMonth || 0}</div>
+                  <div className="text-sm text-gray-400">Meets/Month</div>
+                </div>
+                <div className="text-center p-4 bg-gray-800/50 rounded-lg">
+                  <div className="text-2xl font-bold text-blue-400">{user?.qualityScore || 0}/5</div>
+                  <div className="text-sm text-gray-400">Quality Score</div>
+                </div>
+              </div>
+
+              {/* Profile Details */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-400 mb-2">Profile Name</label>
@@ -125,36 +144,93 @@ export default function MyProfile() {
                       type="text"
                       value={formData.profileName || ''}
                       onChange={(e) => setFormData({...formData, profileName: e.target.value})}
-                      className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
+                      className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                     />
                   ) : (
-                    <div className="text-white">{user?.profileName}</div>
+                    <div className="text-white text-lg">{user?.profileName}</div>
                   )}
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-400 mb-2">Age</label>
-                  <div className="text-white">{user?.age}</div>
+                  <div className="text-white text-lg">{user?.age} years</div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-400 mb-2">Gender</label>
-                  <div className="text-white capitalize">{user?.gender}</div>
+                  <div className="text-white text-lg capitalize">{user?.gender}</div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Location</label>
-                  <div className="text-white">{user?.address?.city}, {user?.address?.locality}</div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    <MapPin size={16} className="inline mr-1" />
+                    Location
+                  </label>
+                  <div className="text-white text-lg">{user?.address?.city}, {user?.address?.locality}</div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">Education</label>
+                  {editing ? (
+                    <select
+                      value={formData.education || ''}
+                      onChange={(e) => setFormData({...formData, education: e.target.value})}
+                      className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-orange-500"
+                    >
+                      <option value="">Select...</option>
+                      <option value="high-school">High School</option>
+                      <option value="bachelors">Bachelor's</option>
+                      <option value="masters">Master's</option>
+                      <option value="phd">PhD</option>
+                    </select>
+                  ) : (
+                    <div className="text-white text-lg capitalize">{user?.education?.replace('-', ' ') || 'Not specified'}</div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    <Briefcase size={16} className="inline mr-1" />
+                    Purpose
+                  </label>
+                  <div className="text-white text-lg capitalize">{user?.purposeOnApp?.replace(/-/g, ' ')}</div>
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Hobbies</label>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    <Heart size={16} className="inline mr-1" />
+                    Hobbies & Interests
+                  </label>
                   <div className="flex flex-wrap gap-2">
-                    {user?.hobbies?.map((hobby) => (
-                      <span key={hobby} className="px-3 py-1 bg-gray-800 text-gray-300 rounded-full text-sm">
+                    {user?.hobbies?.map((hobby, index) => (
+                      <span key={index} className="px-4 py-2 bg-gray-800 text-gray-300 rounded-full text-sm border border-gray-700">
                         {hobby}
                       </span>
                     ))}
+                  </div>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-400 mb-2">Subscription</label>
+                  <div className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg">
+                    <div>
+                      <div className="text-white font-semibold capitalize">{user?.subscriptionType} Plan</div>
+                      <div className="text-sm text-gray-400">
+                        {user?.subscriptionType === 'premium' 
+                          ? 'Unlimited features' 
+                          : user?.subscriptionType === 'regular'
+                          ? '50 searches/month'
+                          : '10 searches/month'}
+                      </div>
+                    </div>
+                    {user?.subscriptionType !== 'premium' && (
+                      <button
+                        onClick={() => router.push('/subscription')}
+                        className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-500 hover:to-pink-500 transition-all"
+                      >
+                        Upgrade
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
