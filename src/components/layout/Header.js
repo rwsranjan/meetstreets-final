@@ -77,7 +77,7 @@ export default function Header() {
                   {showUserMenu && (
                     <div className="absolute right-0 mt-2 w-48 bg-gray-900 border border-gray-800 rounded-lg shadow-xl py-2 z-50">
                       <Link
-                        href={`/profile/${user.id}`}
+                        href="/my-profile"
                         className="flex items-center gap-3 px-4 py-2 text-gray-300 hover:bg-gray-800 transition-colors"
                         onClick={() => setShowUserMenu(false)}
                       >
