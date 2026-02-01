@@ -21,15 +21,16 @@ export default async function handler(req, res) {
       participants: { $all: [user.userId, receiverId] }
     });
 
-    if (!conversation) {
-      conversation = await Conversation.create({
-        participants: [user.userId, receiverId],
-        unreadCount: [
-          { user: user.userId, count: 0 },
-          { user: receiverId, count: 1 }
-        ]
-      });
-    }
+  if (!conversation) {
+  conversation = await Conversation.create({
+    participants: [user.userId, receiverId],
+    unreadCount: [
+      { user: user.userId, count: 0 },
+      { user: receiverId, count: 0 }
+    ]
+  });
+}
+
 
     // Create message
     const message = await Message.create({

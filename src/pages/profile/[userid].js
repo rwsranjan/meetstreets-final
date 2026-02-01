@@ -66,6 +66,31 @@ export default function UserProfile() {
     }
   };
 
+ const startChat = async () => {
+  try {
+    const token = localStorage.getItem("token");
+
+    const res = await fetch("/api/messages/send", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        receiverId: params.userId, // 🔥 MUST be receiverId
+        content: "Hi 👋",
+      }),
+    });
+
+    const data = await res.json();
+    router.push(`/messages/${data.conversationId}`);
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-orange-950 flex items-center justify-center">
@@ -136,13 +161,14 @@ export default function UserProfile() {
                   >
                     <Heart size={20} className={isFavorite ? "fill-red-500 text-red-500" : "text-gray-400"} />
                   </button>
-                  <button
-                    onClick={() => router.push(`/messages?userId=${params.userId}`)}
-                    className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-                  >
-                    <MessageCircle size={20} />
-                    Message
-                  </button>
+                 <button
+  onClick={startChat}
+  className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+>
+  <MessageCircle size={20} />
+  Message
+</button>
+
                   <button
                     onClick={() => setShowMatchModal(true)}
                     className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white rounded-lg font-semibold transition-all shadow-lg shadow-orange-600/30"
