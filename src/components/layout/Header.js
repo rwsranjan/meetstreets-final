@@ -5,27 +5,40 @@ import Link from "next/link";
 import { Menu, X, MapPin, Users, Calendar, Search, User, LogOut, Settings, Wallet, MessageCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
 
-  useEffect(() => {
-    // Check if user is logged in
-    const userData = localStorage.getItem('user');
-    if (userData) {
-      setUser(JSON.parse(userData));
-    }
-  }, []);
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setUser(null);
-    router.push('/');
+useEffect(() => {
+  const syncUser = () => {
+    const userData = localStorage.getItem("user");
+    setUser(userData ? JSON.parse(userData) : null);
   };
+
+  syncUser(); // run on mount + route change
+
+  window.addEventListener("auth-change", syncUser);
+
+  return () => {
+    window.removeEventListener("auth-change", syncUser);
+  };
+}, [pathname]);  // 👈 important
+
+
+const handleLogout = () => {
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+  setUser(null);
+
+  window.dispatchEvent(new Event("auth-change"));
+
+  router.push("/");
+};
 
   return (
     <header className="fixed top-0 z-50 w-full border-b border-orange-900/30 bg-gradient-to-b from-gray-950 via-gray-950 to-gray-900/90 backdrop-blur-xl">

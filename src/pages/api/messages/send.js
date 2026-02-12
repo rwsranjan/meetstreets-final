@@ -1,7 +1,6 @@
- 
 import dbConnect from '../../../../lib/mongodb';
- import Conversation from '../../../../models/Conversation';
-import Message from '../../../../models/Message'
+import Conversation from '../../../../models/Conversation';
+import Message from '../../../../models/Message';
 import { verifyToken } from '../../../../utils/auth';
 
 export default async function handler(req, res) {
@@ -11,56 +10,79 @@ export default async function handler(req, res) {
 
   try {
     await dbConnect();
-    const user = await verifyToken(req);
-    if (!user) return res.status(401).json({ message: 'Unauthorized' });
 
-    const { receiverId, content, messageType = 'text', mediaUrl } = req.body;
+    const authUser = await verifyToken(req);
+    if (!authUser) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
 
-    // Find or create conversation
-    let conversation = await Conversation.findOne({
-      participants: { $all: [user.userId, receiverId] }
-    });
+    const {
+      conversationId,
+      receiverId,
+      content,
+      messageType = 'text',
+      mediaUrl = null
+    } = req.body;
 
-  if (!conversation) {
-  conversation = await Conversation.create({
-    participants: [user.userId, receiverId],
-    unreadCount: [
-      { user: user.userId, count: 0 },
-      { user: receiverId, count: 0 }
-    ]
-  });
-}
+    if (!receiverId || !content) {
+      return res.status(400).json({ message: 'Missing fields' });
+    }
 
+    let conversation;
 
-    // Create message
+    // 1️⃣ Use existing conversation if provided
+    if (conversationId) {
+      conversation = await Conversation.findById(conversationId);
+    }
+
+    // 2️⃣ Otherwise find or create
+    if (!conversation) {
+      conversation = await Conversation.findOne({
+        participants: { $all: [authUser.userId, receiverId] }
+      });
+
+      if (!conversation) {
+        conversation = await Conversation.create({
+          participants: [authUser.userId, receiverId],
+          unreadCount: [
+            { user: authUser.userId, count: 0 },
+            { user: receiverId, count: 0 }
+          ]
+        });
+      }
+    }
+
+    // 3️⃣ Create message
     const message = await Message.create({
       conversation: conversation._id,
-      sender: user.userId,
+      sender: authUser.userId,
       receiver: receiverId,
       content,
       messageType,
       mediaUrl
     });
 
-    // Update conversation
+    // 4️⃣ Update conversation metadata
     conversation.lastMessage = message._id;
     conversation.lastMessageAt = new Date();
-    
-    // Increment unread count for receiver
+
     const receiverUnread = conversation.unreadCount.find(
       u => u.user.toString() === receiverId
     );
-    if (receiverUnread) {
-      receiverUnread.count += 1;
-    }
-    
+
+    if (receiverUnread) receiverUnread.count += 1;
+
     await conversation.save();
 
-    // TODO: Emit socket event for real-time delivery
-
-    res.status(201).json({ message, conversationId: conversation._id });
+    res.status(201).json({
+      message,
+      conversationId: conversation._id
+    });
   } catch (error) {
     console.error('Send message error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({
+      message: 'Server error',
+      error: error.message
+    });
   }
 }

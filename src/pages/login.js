@@ -42,6 +42,7 @@ export default function Login() {
       // Store token
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
+window.dispatchEvent(new Event("auth-change"));
 
       // Redirect to dashboard
       router.push('/dashboard');

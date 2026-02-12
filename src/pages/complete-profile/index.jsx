@@ -149,7 +149,8 @@ export default function CompleteProfile() {
       // Update user in localStorage
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       localStorage.setItem('user', JSON.stringify({ ...user, ...data.user }));
-
+window.dispatchEvent(new Event("auth-change"));
+x
       // Redirect to dashboard
       router.push('/dashboard');
     } catch (err) {

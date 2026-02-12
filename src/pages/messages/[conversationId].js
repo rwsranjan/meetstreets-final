@@ -106,50 +106,50 @@ const conversationId = params?.conversationId;
   };
 
   /* ---------------- SEND MESSAGE ---------------- */
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!newMessage.trim() || sending) return;
+const handleSendMessage = async (e) => {
+  e.preventDefault();
+  if (!newMessage.trim() || sending || !participant) return;
 
-    setSending(true);
-    const text = newMessage;
-    setNewMessage("");
+  const text = newMessage;
+  setNewMessage("");
+  setSending(true);
 
-    try {
-      const token = localStorage.getItem("token");
+  try {
+    const token = localStorage.getItem("token");
 
-      const res = await fetch("/api/messages/send", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          conversationId,
-          content: text,
-          recipientId: participant?._id,
-        }),
-      });
+    const res = await fetch("/api/messages/send", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        conversationId,
+        receiverId: participant._id,
+        content: text,
+      }),
+    });
 
-      if (res.ok) {
-        const { message } = await res.json();
+    if (!res.ok) throw new Error("Send failed");
 
-        // 🔥 realtime emit
-        sendMessage({
-          conversationId,
-          content: message.content,
-          sender: currentUserId,
-          createdAt: message.createdAt,
-        });
+    const { message } = await res.json();
 
-        setMessages((prev) => [...prev, message]);
-      }
-    } catch (err) {
-      console.error("Send failed:", err);
-      setNewMessage(text);
-    } finally {
-      setSending(false);
-    }
-  };
+    // realtime emit
+    sendMessage({
+      conversationId: message.conversation,
+      sender: message.sender,
+      content: message.content,
+      createdAt: message.createdAt,
+    });
+
+    setMessages((prev) => [...prev, message]);
+  } catch (err) {
+    console.error("Send failed:", err);
+    setNewMessage(text);
+  } finally {
+    setSending(false);
+  }
+};
 
   /* ---------------- CALLS ---------------- */
   const startVoiceCall = () => {
@@ -211,12 +211,13 @@ const conversationId = params?.conversationId;
       {/* MESSAGES */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((msg, i) => (
-          <MessageBubble
-            key={msg._id || i}
-            message={msg}
-            isOwn={msg.sender === currentUserId}
-          />
-        ))}
+  <MessageBubble
+    key={msg._id || i}
+    message={msg}
+    isOwn={msg.sender?.toString() === currentUserId}
+  />
+))}
+
         <div ref={messagesEndRef} />
       </div>
 
