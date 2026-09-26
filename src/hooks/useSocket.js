@@ -22,7 +22,7 @@ export function useSocket() {
   };
 
   const onMessage = (callback) => {
-    socketRef.current?.on('new_message', callback);
+    socketRef.current?.on('receive_message', callback);
   };
 
   const startCall = (callData) => {

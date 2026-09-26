@@ -1,7 +1,8 @@
-import dbConnect from '../../../../lib/mongodb';
-import User from '../../../../models/User';
+import pool from '../../../../utils/mysql';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { randomUUID } from 'crypto';
+import { sendEmail } from '../../../../lib/mailer';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -9,8 +10,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    await dbConnect();
-
     const {
       email,
       mobile,
@@ -20,13 +19,12 @@ export default async function handler(req, res) {
       gender,
       purposeOnApp,
       referralCode,
-      address // optional address from frontend
+      address,
+      provider,
+      providerId
     } = req.body;
 
-    // ----------------------------
-    // Basic Validation
-    // ----------------------------
-    if (!email || !password || !profileName || !age || !gender || !purposeOnApp) {
+    if (!email || (!password && !provider) || !profileName || !age || !gender || !purposeOnApp) {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
@@ -34,49 +32,47 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'Must be 18 or older' });
     }
 
-    // ----------------------------
-    // Check if user exists
-    // ----------------------------
-    const existingUser = await User.findOne({ 
-      $or: [{ email }, { mobile: mobile || null }] 
-    });
+    const [existingUsers] = await pool.query(
+      'SELECT id FROM users WHERE email = ? OR (mobile = ? AND mobile IS NOT NULL)',
+      [email, mobile]
+    );
 
-    if (existingUser) {
+    if (existingUsers.length > 0) {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    // ----------------------------
-    // Calculate age range
-    // ----------------------------
     const ageRange = 
       age >= 18 && age <= 25 ? '18-25' :
       age >= 26 && age <= 30 ? '26-30' :
       age >= 31 && age <= 40 ? '31-40' :
       age >= 41 && age <= 50 ? '40-50' : '50+';
 
-    // ----------------------------
-    // Handle referral
-    // ----------------------------
-    let referredBy = null;
+    let referredById = null;
+    let initialCoins = 100;
+    
     if (referralCode) {
-      const referrer = await User.findOne({ referralCode });
-      if (referrer) {
-        referredBy = referrer._id;
-        referrer.coins += 50;
-        referrer.totalReferrals += 1;
-        await referrer.save();
+      const [referrers] = await pool.query('SELECT id, coins, totalReferrals FROM users WHERE referralCode = ?', [referralCode]);
+      if (referrers.length > 0) {
+        const referrer = referrers[0];
+        referredById = referrer.id;
+        initialCoins = 150;
+        
+        await pool.query(
+          'UPDATE users SET coins = coins + 50, totalReferrals = totalReferrals + 1 WHERE id = ?',
+          [referrer.id]
+        );
       }
     }
 
-    // ----------------------------
-    // Hash password
-    // ----------------------------
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
+    const userId = randomUUID();
+    const newReferralCode = 'MS' + Math.random().toString(36).substring(2, 10).toUpperCase();
 
-    // ----------------------------
-    // Clean address coordinates
-    // ----------------------------
-    let cleanAddress = undefined;
+    const googleId = provider === 'google' ? providerId : null;
+    // const facebookId = provider === 'facebook' ? providerId : null;
+    const facebookId = null;
+
+    let cleanAddress = null;
     if (address) {
       cleanAddress = { ...address };
       if (
@@ -84,47 +80,54 @@ export default async function handler(req, res) {
         (!Array.isArray(cleanAddress.coordinates.coordinates) ||
           cleanAddress.coordinates.coordinates.length !== 2)
       ) {
-        // Remove invalid coordinates to prevent MongoDB 2dsphere error
         delete cleanAddress.coordinates;
       }
     }
 
-    // ----------------------------
-    // Create user
-    // ----------------------------
-    const user = await User.create({
-      email,
-      mobile,
-      password: hashedPassword,
-      profileName,
-      age,
-      gender,
-      purposeOnApp,
-      ageRange,
-      referredBy,
-      welcomePoints: 100,
-      coins: referredBy ? 150 : 100,
-      address: cleanAddress // optional
-    });
+    await pool.query(
+      `INSERT INTO users (
+        id, email, mobile, password, profileName, age, gender, 
+        purposeOnApp, ageRange, referredBy, welcomePoints, coins, 
+        address, referralCode, googleId, facebookId
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        userId, email, mobile || null, hashedPassword, profileName, age, gender,
+        purposeOnApp, ageRange, referredById, 100, initialCoins,
+        cleanAddress ? JSON.stringify(cleanAddress) : null,
+        newReferralCode, googleId, facebookId
+      ]
+    );
 
-    // ----------------------------
-    // Generate JWT
-    // ----------------------------
     const token = jwt.sign(
-      { userId: user._id, email: user.email },
+      { userId, email },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
+
+    // Send Welcome Email (non-blocking)
+    sendEmail({
+      to: email,
+      subject: "Welcome to MeetStreet! 🚀",
+      html: `
+        <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
+          <h2 style="color: #f97316;">Welcome to MeetStreet, ${profileName}!</h2>
+          <p>We're thrilled to have you join our community.</p>
+          <p>You've received <strong>${initialCoins} Coins</strong> to get started.</p>
+          <br/>
+          <a href="${process.env.NEXTAUTH_URL || 'http://localhost:3000'}" style="background-color: #f97316; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Explore Matches</a>
+        </div>
+      `
+    }).catch(err => console.error("Failed to send welcome email:", err));
 
     res.status(201).json({
       message: 'User registered successfully',
       token,
       user: {
-        id: user._id,
-        email: user.email,
-        profileName: user.profileName,
-        referralCode: user.referralCode,
-        coins: user.coins
+        id: userId,
+        email,
+        profileName,
+        referralCode: newReferralCode,
+        coins: initialCoins
       }
     });
 

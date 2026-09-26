@@ -1,7 +1,6 @@
-import dbConnect from '../../../../lib/mongodb';
-import User from '../../../../models/User';
-import Transaction from '../../../../models/Transaction';
+import pool from '../../../../utils/mysql';
 import { verifyToken } from '../../../../utils/auth';
+import { randomUUID } from 'crypto';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -9,77 +8,42 @@ export default async function handler(req, res) {
   }
 
   try {
-    await dbConnect();
-
     const user = await verifyToken(req);
-    if (!user) {
-      return res.status(401).json({ message: 'Unauthorized' });
-    }
+    if (!user) return res.status(401).json({ message: 'Unauthorized' });
 
     const { coins, withdrawalMethod, accountDetails } = req.body;
+    if (!coins || coins <= 0) return res.status(400).json({ message: 'Invalid coin amount' });
+    if (!withdrawalMethod || !accountDetails) return res.status(400).json({ message: 'Withdrawal details required' });
 
-    if (!coins || coins <= 0) {
-      return res.status(400).json({ message: 'Invalid coin amount' });
-    }
-
-    if (!withdrawalMethod || !accountDetails) {
-      return res.status(400).json({ message: 'Withdrawal details required' });
-    }
-
-    // Minimum withdrawal limit
     const MIN_WITHDRAWAL = 500;
-    if (coins < MIN_WITHDRAWAL) {
-      return res.status(400).json({ 
-        message: `Minimum withdrawal is ${MIN_WITHDRAWAL} coins` 
-      });
-    }
+    if (coins < MIN_WITHDRAWAL) return res.status(400).json({ message: `Minimum withdrawal is ${MIN_WITHDRAWAL} coins` });
 
-    const currentUser = await User.findById(user.userId);
+    const [uRows] = await pool.query('SELECT coins, linkedWallet FROM users WHERE id = ?', [user.userId]);
+    const currentUser = uRows[0];
+    if (currentUser.coins < coins) return res.status(400).json({ message: 'Insufficient coins' });
 
-    // Check if user has enough coins
-    if (currentUser.coins < coins) {
-      return res.status(400).json({ message: 'Insufficient coins' });
-    }
-
-    // Check if wallet is linked
-    if (!currentUser.linkedWallet || 
-        (!currentUser.linkedWallet.paytmNumber && 
-         !currentUser.linkedWallet.upiId && 
-         !currentUser.linkedWallet.bankAccount)) {
+    const linkedWallet = typeof currentUser.linkedWallet === 'string' ? JSON.parse(currentUser.linkedWallet) : currentUser.linkedWallet;
+    if (!linkedWallet || (!linkedWallet.paytmNumber && !linkedWallet.upiId && !linkedWallet.bankAccount)) {
       return res.status(400).json({ message: 'Please link your wallet first' });
     }
 
-    // Calculate platform fee (2% for withdrawals)
     const platformFeePercent = 2;
     const platformFee = Math.ceil((coins * platformFeePercent) / 100);
     const netAmount = coins - platformFee;
+    const txId = randomUUID();
+    const withdrawalDetails = { method: withdrawalMethod, accountDetails };
 
-    // Create transaction
-    const transaction = await Transaction.create({
-      user: user.userId,
-      type: 'withdrawal',
-      amount: netAmount,
-      coins: -coins,
-      paymentMethod: withdrawalMethod,
-      platformFee,
-      netAmount,
-      withdrawalDetails: {
-        method: withdrawalMethod,
-        accountDetails
-      },
-      status: 'pending',
-      description: `Withdrawal of ${coins} coins`
-    });
+    await pool.query(`
+      INSERT INTO transactions (id, userId, type, amount, coins, paymentMethod, platformFee, netAmount, withdrawalDetails, status, description)
+      VALUES (?, ?, 'withdrawal', ?, ?, ?, ?, ?, ?, 'pending', ?)
+    `, [txId, user.userId, netAmount, -coins, withdrawalMethod, platformFee, netAmount, JSON.stringify(withdrawalDetails), `Withdrawal of ${coins} coins`]);
 
-    // Deduct coins from user
-    currentUser.coins -= coins;
-    await currentUser.save();
-
-    // TODO: Process withdrawal through payment gateway
+    await pool.query('UPDATE users SET coins = coins - ? WHERE id = ?', [coins, user.userId]);
+    const [txRows] = await pool.query('SELECT * FROM transactions WHERE id = ?', [txId]);
 
     res.status(200).json({
       message: 'Withdrawal request submitted successfully',
-      transaction,
+      transaction: txRows[0],
       platformFee,
       netAmount
     });

@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 
 import { 
   MapPin, Heart, MessageCircle, Send, Ban, Flag,
-  Sparkles, Calendar, Coffee, Briefcase, GraduationCap
+  Sparkles, Calendar, Coffee, Briefcase, GraduationCap, User, Check
 } from 'lucide-react';
 
 export default function UserProfile() {
@@ -59,6 +59,7 @@ export default function UserProfile() {
       
       if (res.ok) {
         alert('Match request sent!');
+        setProfile(prev => ({ ...prev, connectionStatus: 'pending', initiatedByMe: true }));
         setShowMatchModal(false);
       }
     } catch (error) {
@@ -70,15 +71,14 @@ export default function UserProfile() {
   try {
     const token = localStorage.getItem("token");
 
-    const res = await fetch("/api/messages/send", {
+    const res = await fetch("/api/messages/start", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        receiverId: params.userId, // 🔥 MUST be receiverId
-        content: "Hi 👋",
+        receiverId: params.userId,
       }),
     });
 
@@ -117,87 +117,109 @@ export default function UserProfile() {
       
       <main className="pt-24 pb-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-5xl mx-auto">
-          {/* Profile Header */}
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden mb-6">
-            <div className="h-64 bg-gradient-to-br from-orange-500 to-amber-500 relative">
-              {profile.profilePictures?.[0] && (
-                <img 
-                  src={profile.profilePictures[0].url} 
-                  alt={profile.profileName}
-                  className="w-full h-full object-cover"
-                />
-              )}
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden mb-6 shadow-2xl">
+            {/* Gradient Hero Strip */}
+            <div className="h-32 sm:h-40 bg-gradient-to-br from-orange-600 via-rose-500 to-purple-600 relative overflow-hidden">
+              <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 30% 70%, rgba(255,255,255,0.10) 0%, transparent 60%)' }}></div>
             </div>
             
-            <div className="p-6 md:p-8">
-              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h1 className="text-3xl font-bold text-white">{profile.profileName}</h1>
-                    {profile.isOnline && (
-                      <span className="px-3 py-1 bg-green-500/20 text-green-400 text-sm rounded-full border border-green-500/30">
-                        Online
-                      </span>
+            <div className="px-5 sm:px-8 pb-6 sm:pb-8">
+              <div className="flex flex-col sm:flex-row sm:items-end gap-5 sm:gap-6">
+                
+                {/* Avatar (Intersecting) */}
+                <div className="relative self-start flex-shrink-0 -mt-16 sm:-mt-20 z-10">
+                  <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-2xl bg-gradient-to-br from-orange-500 to-rose-500 border-4 border-gray-900 overflow-hidden shadow-2xl">
+                    {profile.profilePictures?.[0] ? (
+                      <img src={profile.profilePictures[0].url} alt={profile.profileName} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-white text-5xl font-black">
+                        {profile.profileName?.charAt(0)?.toUpperCase() || 'U'}
+                      </div>
                     )}
                   </div>
-                  
-                  <div className="flex items-center gap-2 text-gray-400 mb-2">
-                    <MapPin size={16} />
-                    <span>{profile.address?.city}, {profile.address?.locality}</span>
-                  </div>
-
-                  {profile.aiMatchScore && (
-                    <div className="flex items-center gap-2 text-orange-400">
-                      <Sparkles size={16} />
-                      <span className="font-semibold">{profile.aiMatchScore}% Compatible</span>
-                    </div>
+                  {Boolean(profile.isOnline) && (
+                    <div className="absolute bottom-2 right-2 w-4 h-4 bg-green-500 rounded-full border-2 border-gray-900 shadow-[0_0_10px_rgba(34,197,94,0.5)]"></div>
                   )}
                 </div>
 
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setIsFavorite(!isFavorite)}
-                    className="p-3 border border-gray-700 rounded-lg hover:border-orange-500 transition-colors"
-                  >
-                    <Heart size={20} className={isFavorite ? "fill-red-500 text-red-500" : "text-gray-400"} />
-                  </button>
-                 <button
-  onClick={startChat}
-  className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
->
-  <MessageCircle size={20} />
-  Message
-</button>
+                {/* Info & Actions */}
+                <div className="flex-1 min-w-0 pt-2 sm:pt-0">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <div>
+                      <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">{profile.profileName}</h1>
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-2 text-sm">
+                        <div className="flex items-center gap-1.5 text-gray-400">
+                          <MapPin size={16} className="text-orange-400" />
+                          <span>{profile.address?.city}, {profile.address?.locality}</span>
+                        </div>
+                        {profile.aiMatchScore && (
+                          <div className="flex items-center gap-1.5 text-amber-400 bg-amber-400/10 px-2.5 py-1 rounded-full font-medium border border-amber-400/20">
 
-                  <button
-                    onClick={() => setShowMatchModal(true)}
-                    className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white rounded-lg font-semibold transition-all shadow-lg shadow-orange-600/30"
-                  >
-                    <Send size={20} />
-                    Connect
-                  </button>
+                            <Sparkles size={14} />
+                            <span>{profile.aiMatchScore}% Compatible</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mt-4 lg:mt-0 w-full lg:w-auto">
+                      <div className="flex gap-3">
+                        <button onClick={() => setIsFavorite(!isFavorite)} className="p-3 bg-gray-800 border border-gray-700 rounded-xl hover:border-orange-500 hover:bg-gray-750 transition-all shadow-lg flex-shrink-0">
+                          <Heart size={20} className={isFavorite ? "fill-red-500 text-red-500" : "text-gray-400"} />
+                        </button>
+                        <button onClick={startChat} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-semibold transition-all shadow-lg shadow-indigo-600/20 whitespace-nowrap">
+                          <MessageCircle size={20} />
+                          Message
+                        </button>
+                      </div>
+                      
+                      {profile.connectionStatus === 'pending' ? (
+                        profile.initiatedByMe ? (
+                          <button disabled className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-gray-700 text-gray-300 rounded-xl font-bold opacity-80 cursor-not-allowed whitespace-nowrap">
+                            <Check size={20} />
+                            Request Sent
+                          </button>
+                        ) : (
+                          <button onClick={() => router.push('/matches')} className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold transition-all shadow-lg shadow-green-600/30 whitespace-nowrap">
+                            <Check size={20} />
+                            Accept Request
+                          </button>
+                        )
+                      ) : profile.connectionStatus === 'accepted' || profile.connectionStatus === 'matched' ? (
+                        <button disabled className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-xl font-bold shadow-lg opacity-90 cursor-default whitespace-nowrap">
+                          <Check size={20} />
+                          Connected
+                        </button>
+                      ) : (
+                        <button onClick={() => setShowMatchModal(true)} className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-400 hover:to-rose-400 text-white rounded-xl font-bold transition-all shadow-lg shadow-orange-500/30 whitespace-nowrap">
+                          <Send size={20} />
+                          Connect
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {/* Quick Stats */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center p-3 bg-gray-800/50 rounded-lg">
-                  <div className="text-2xl font-bold text-orange-400">{profile.meetsPerMonth || 0}</div>
-                  <div className="text-sm text-gray-400">Meets/Month</div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8 pt-8 border-t border-gray-800">
+                <div className="text-center p-4 bg-gray-800/30 rounded-2xl border border-gray-700/50 hover:bg-gray-800/50 transition-colors">
+                  <div className="text-2xl font-bold text-orange-400 mb-1">{profile.meetsPerMonth || 0}</div>
+                  <div className="text-sm font-medium text-gray-400">Meets/Month</div>
                 </div>
-                <div className="text-center p-3 bg-gray-800/50 rounded-lg">
-                  <div className="text-2xl font-bold text-green-400">{profile.qualityScore || 0}/5</div>
-                  <div className="text-sm text-gray-400">Quality Score</div>
+                <div className="text-center p-4 bg-gray-800/30 rounded-2xl border border-gray-700/50 hover:bg-gray-800/50 transition-colors">
+                  <div className="text-2xl font-bold text-green-400 mb-1">{profile.qualityScore || 0}/5</div>
+                  <div className="text-sm font-medium text-gray-400">Quality Score</div>
                 </div>
-                <div className="text-center p-3 bg-gray-800/50 rounded-lg">
-                  <div className="text-2xl font-bold text-blue-400">{profile.ageRange}</div>
-                  <div className="text-sm text-gray-400">Age Range</div>
+                <div className="text-center p-4 bg-gray-800/30 rounded-2xl border border-gray-700/50 hover:bg-gray-800/50 transition-colors">
+                  <div className="text-2xl font-bold text-blue-400 mb-1">{profile.ageRange || '-'}</div>
+                  <div className="text-sm font-medium text-gray-400">Age Range</div>
                 </div>
-                <div className="text-center p-3 bg-gray-800/50 rounded-lg">
-                  <div className="text-2xl font-bold text-purple-400">
+                <div className="text-center p-4 bg-gray-800/30 rounded-2xl border border-gray-700/50 hover:bg-gray-800/50 transition-colors">
+                  <div className="text-2xl font-bold text-purple-400 mb-1">
                     {profile.subscriptionType === 'premium' ? '⭐' : profile.subscriptionType === 'regular' ? '✓' : '•'}
                   </div>
-                  <div className="text-sm text-gray-400 capitalize">{profile.subscriptionType}</div>
+                  <div className="text-sm font-medium text-gray-400 capitalize">{profile.subscriptionType || 'Free'}</div>
                 </div>
               </div>
             </div>
@@ -209,23 +231,69 @@ export default function UserProfile() {
               {/* About */}
               <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
                 <h2 className="text-xl font-bold text-white mb-4">About</h2>
-                <div className="space-y-3">
-                  <InfoRow icon={<Briefcase size={18} />} label="Purpose" value={profile.purposeOnApp?.replace('-', ' ')} />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <InfoRow icon={<Briefcase size={18} />} label="Purpose" value={
+                    {
+                      'offering-time-company': 'Offering Time & Company',
+                      'looking-for-time-company': 'Looking for Company',
+                      'both': 'Both'
+                    }[profile.purposeOnApp] || profile.purposeOnApp
+                  } />
                   <InfoRow icon={<GraduationCap size={18} />} label="Education" value={profile.education} />
+                  <InfoRow icon={<GraduationCap size={18} />} label="Degree / Field" value={profile.degreeType} />
+                  <InfoRow icon={<User size={18} />} label="Height" value={profile.height} />
+                  <InfoRow icon={<User size={18} />} label="Ethnic Background" value={profile.ethnicBackground} />
+                  <InfoRow icon={<Heart size={18} />} label="Want Kids" value={profile.wantKids} />
+                  <InfoRow icon={<Sparkles size={18} />} label="Religious Beliefs" value={profile.religiousBeliefs} />
+                  <InfoRow icon={<Briefcase size={18} />} label="Exercise Habits" value={profile.exerciseHabits} />
                   <InfoRow icon={<Coffee size={18} />} label="Eating Habits" value={profile.eatingHabits} />
+                  <InfoRow icon={<MapPin size={18} />} label="Favorite Place to Meet" value={profile.interestsMeta?.favoritePlaceToMeet} />
+                  <InfoRow icon={<MapPin size={18} />} label="Traveler Type" value={profile.interestsMeta?.travelerType} />
                 </div>
               </div>
 
               {/* Interests & Hobbies */}
               <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-                <h2 className="text-xl font-bold text-white mb-4">Interests & Hobbies</h2>
-                <div className="flex flex-wrap gap-2">
-                  {profile.hobbies?.map((hobby) => (
-                    <span key={hobby} className="px-4 py-2 bg-gray-800 text-gray-300 rounded-lg">
-                      {hobby}
-                    </span>
-                  ))}
-                </div>
+                <h2 className="text-xl font-bold text-white mb-4">Interests</h2>
+                
+                {profile.hobbies && profile.hobbies.length > 0 && (
+                  <div className="mb-4">
+                    <h3 className="text-sm text-gray-400 mb-2 uppercase tracking-wider font-semibold">Hobbies</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {profile.hobbies.map((hobby) => (
+                        <span key={hobby} className="px-3 py-1 bg-gray-800 text-gray-300 rounded-full text-sm">
+                          {hobby}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {profile.favoriteFood && profile.favoriteFood.length > 0 && (
+                  <div className="mb-4">
+                    <h3 className="text-sm text-gray-400 mb-2 uppercase tracking-wider font-semibold">Favorite Cuisines</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {profile.favoriteFood.map((food) => (
+                        <span key={food} className="px-3 py-1 bg-gray-800 text-gray-300 rounded-full text-sm">
+                          {food}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {profile.favoriteMusic && profile.favoriteMusic.length > 0 && (
+                  <div>
+                    <h3 className="text-sm text-gray-400 mb-2 uppercase tracking-wider font-semibold">Favorite Music</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {profile.favoriteMusic.map((music) => (
+                        <span key={music} className="px-3 py-1 bg-gray-800 text-gray-300 rounded-full text-sm">
+                          {music}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Photos */}

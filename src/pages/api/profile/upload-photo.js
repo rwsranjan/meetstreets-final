@@ -1,5 +1,4 @@
-import dbConnect from '../../../../lib/mongodb';
-import User from '../../../../models/User';
+import pool from '../../../../utils/mysql';
 import { verifyToken } from '../../../../utils/auth';
 import upload from '../../../../lib/multer';
 
@@ -21,8 +20,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    await dbConnect();
-
     const authUser = await verifyToken(req);
     if (!authUser) {
       return res.status(401).json({ message: 'Unauthorized' });
@@ -34,29 +31,27 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'No files uploaded' });
     }
 
-    // Get current user to determine primary image logic
-    const existingUser = await User.findById(authUser.userId);
+    const [rows] = await pool.query('SELECT profilePictures FROM users WHERE id = ?', [authUser.userId]);
+    const existingUser = rows[0];
+    
+    let profilePictures = [];
+    if (existingUser && existingUser.profilePictures) {
+      profilePictures = typeof existingUser.profilePictures === 'string' ? JSON.parse(existingUser.profilePictures) : existingUser.profilePictures;
+    }
 
     const imageObjects = req.files.map((file, index) => ({
       url: `/uploads/profiles/${file.filename}`,
-      isPrimary:
-        existingUser.profilePictures.length === 0 && index === 0,
-      uploadedAt: new Date()
+      isPrimary: profilePictures.length === 0 && index === 0,
+      uploadedAt: new Date().toISOString()
     }));
 
-    const updatedUser = await User.findByIdAndUpdate(
-      authUser.userId,
-      {
-        $push: {
-          profilePictures: { $each: imageObjects }
-        }
-      },
-      { new: true }
-    ).select('-password');
+    const newProfilePictures = [...profilePictures, ...imageObjects];
+
+    await pool.query('UPDATE users SET profilePictures = ? WHERE id = ?', [JSON.stringify(newProfilePictures), authUser.userId]);
 
     return res.status(200).json({
       message: 'Images uploaded successfully',
-      images: updatedUser.profilePictures
+      images: newProfilePictures
     });
 
   } catch (err) {

@@ -1,5 +1,4 @@
-import dbConnect from '../../../../lib/mongodb';
-import User from '../../../../models/User';
+import pool from '../../../../utils/mysql';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
@@ -9,8 +8,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    await dbConnect();
-
     const { email, password } = req.body;
 
     if (!email || !password) {
@@ -18,7 +15,8 @@ export default async function handler(req, res) {
     }
 
     // Find user
-    const user = await User.findOne({ email }).select('+password');
+    const [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
+    const user = rows[0];
 
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
@@ -37,13 +35,11 @@ export default async function handler(req, res) {
     }
 
     // Update last seen and online status
-    user.lastSeen = new Date();
-    user.isOnline = true;
-    await user.save();
+    await pool.query('UPDATE users SET lastSeen = NOW(), isOnline = true WHERE id = ?', [user.id]);
 
     // Generate JWT token
     const token = jwt.sign(
-      { userId: user._id, email: user.email },
+      { userId: user.id, email: user.email },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -52,12 +48,12 @@ export default async function handler(req, res) {
       message: 'Login successful',
       token,
       user: {
-        id: user._id,
+        id: user.id,
         email: user.email,
         profileName: user.profileName,
         subscriptionType: user.subscriptionType,
         coins: user.coins,
-        profilePictures: user.profilePictures,
+        profilePictures: typeof user.profilePictures === 'string' ? JSON.parse(user.profilePictures) : user.profilePictures,
         isKYCVerified: user.isKYCVerified
       }
     });

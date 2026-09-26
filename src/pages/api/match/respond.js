@@ -1,5 +1,4 @@
-import dbConnect from '../../../../lib/mongodb';
- import Match from '../../../../models/Match';
+import pool from '../../../../utils/mysql';
 import { verifyToken } from '../../../../utils/auth';
 
 export default async function handler(req, res) {
@@ -8,8 +7,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    await dbConnect();
-
     const user = await verifyToken(req);
     if (!user) {
       return res.status(401).json({ message: 'Unauthorized' });
@@ -25,15 +22,14 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'Invalid action' });
     }
 
-    // Find match
-    const match = await Match.findById(matchId);
+    const [rows] = await pool.query('SELECT * FROM matches WHERE id = ?', [matchId]);
+    const match = rows[0];
 
     if (!match) {
       return res.status(404).json({ message: 'Match request not found' });
     }
 
-    // Verify user is the recipient
-    if (match.user2.toString() !== user.userId && match.user1.toString() !== user.userId) {
+    if (match.user2Id !== user.userId && match.user1Id !== user.userId) {
       return res.status(403).json({ message: 'Not authorized to respond to this match' });
     }
 
@@ -41,21 +37,27 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'Match request already responded to' });
     }
 
-    // Update match status
-    match.status = action === 'accept' ? 'matched' : 'declined';
-    match.responseMessage = responseMessage;
-    match.respondedAt = new Date();
+    const status = action === 'accept' ? 'matched' : 'declined';
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+
+    let sql = `UPDATE matches SET status = ?, responseMessage = ?, respondedAt = ?`;
+    let params = [status, responseMessage || null, now];
+
     if (action === 'accept') {
-      match.matchedAt = new Date();
+      sql += `, matchedAt = ?`;
+      params.push(now);
     }
 
-    await match.save();
+    sql += ` WHERE id = ?`;
+    params.push(matchId);
 
-    // TODO: Send notification to initiator
+    await pool.query(sql, params);
+
+    const [updatedRows] = await pool.query('SELECT * FROM matches WHERE id = ?', [matchId]);
 
     res.status(200).json({
       message: `Match ${action}ed successfully`,
-      match
+      match: updatedRows[0]
     });
   } catch (error) {
     console.error('Respond to match error:', error);

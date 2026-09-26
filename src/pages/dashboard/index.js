@@ -39,6 +39,13 @@ export default function Dashboard() {
         }
       });
 
+      if (res.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        router.push('/login');
+        return;
+      }
+
       if (res.ok) {
         const data = await res.json();
         setStats(data.stats);

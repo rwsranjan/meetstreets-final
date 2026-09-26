@@ -24,3 +24,60 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+button, 
+input[type="submit"], 
+input[type="button"], 
+.button, 
+[role="button"] {
+  cursor: pointer;
+}
+
+/* Light mode inputs */
+input, textarea, select {
+  color: #111827;
+  -webkit-text-fill-color: #111827;
+  background-color: #f9fafb;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #9ca3af !important;
+  -webkit-text-fill-color: #9ca3af !important;
+  opacity: 1;
+}
+
+/* Dark mode inputs */
+@media (prefers-color-scheme: dark) {
+  input, textarea, select {
+    color: #f3f4f6 !important;
+    -webkit-text-fill-color: #f3f4f6 !important;
+    background-color: #1f2937 !important;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: #6b7280 !important;
+    -webkit-text-fill-color: #6b7280 !important;
+  }
+}
+
+/* Fix for browser autofill */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px #f9fafb inset !important;
+    -webkit-text-fill-color: #111827 !important;
+    transition: background-color 5000s ease-in-out 0s;
+}
+
+@media (prefers-color-scheme: dark) {
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px #1f2937 inset !important;
+    -webkit-text-fill-color: #f3f4f6 !important;
+  }
+}

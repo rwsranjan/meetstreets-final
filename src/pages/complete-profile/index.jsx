@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { Camera, Upload, MapPin, Heart, Book, Music, Film, Utensils } from 'lucide-react';
 
@@ -9,6 +9,7 @@ export default function CompleteProfile() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     // Physical Appearance
@@ -84,20 +85,48 @@ export default function CompleteProfile() {
   };
 
   const getCurrentLocation = () => {
+    setLocationLoading(true);
+    setError('');
+    
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setFormData(prev => ({
-            ...prev,
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude
-          }));
-          // TODO: Reverse geocode to get city/locality
+        async (position) => {
+          try {
+            const { latitude, longitude } = position.coords;
+            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=14`);
+            
+            if (res.ok) {
+              const data = await res.json();
+              const address = data.address || {};
+              
+              setFormData(prev => ({
+                ...prev,
+                latitude,
+                longitude,
+                city: address.city || address.town || address.village || address.state_district || prev.city,
+                locality: address.suburb || address.neighbourhood || address.county || prev.locality,
+                state: address.state || prev.state,
+                country: address.country || prev.country
+              }));
+            } else {
+              throw new Error('Geocoding failed');
+            }
+          } catch (error) {
+            console.error('Reverse geocoding error:', error);
+            setError('Failed to fetch location details automatically.');
+          } finally {
+            setLocationLoading(false);
+          }
         },
         (error) => {
           console.error('Location error:', error);
+          setError('Failed to get your location. Please allow location access.');
+          setLocationLoading(false);
         }
       );
+    } else {
+      setError('Geolocation is not supported by this browser.');
+      setLocationLoading(false);
     }
   };
 
@@ -150,7 +179,6 @@ export default function CompleteProfile() {
       const user = JSON.parse(localStorage.getItem('user') || '{}');
       localStorage.setItem('user', JSON.stringify({ ...user, ...data.user }));
 window.dispatchEvent(new Event("auth-change"));
-x
       // Redirect to dashboard
       router.push('/dashboard');
     } catch (err) {
@@ -241,10 +269,20 @@ x
                     <button
                       type="button"
                       onClick={getCurrentLocation}
-                      className="flex items-center gap-2 text-sm text-orange-400 hover:text-orange-300 transition-colors"
+                      disabled={locationLoading}
+                      className="flex items-center gap-2 text-sm text-orange-400 hover:text-orange-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <MapPin size={16} />
-                      Use current location
+                      {locationLoading ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-orange-400 border-t-transparent rounded-full animate-spin"></div>
+                          Fetching location...
+                        </>
+                      ) : (
+                        <>
+                          <MapPin size={16} />
+                          Use current location
+                        </>
+                      )}
                     </button>
                   </div>
 

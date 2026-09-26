@@ -1,8 +1,7 @@
-import dbConnect from '../../../../lib/mongodb';
-import User from '../../../../models/User';
-import Match from '../../../../models/Match';
+import pool from '../../../../utils/mysql';
 import { verifyToken } from '../../../../utils/auth';
-  import { calculateAIMatchScore } from '../../../../utils/Matchingalgorithm';
+import { calculateAIMatchScore } from '../../../../utils/Matchingalgorithm';
+import { randomUUID } from 'crypto';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -10,8 +9,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    await dbConnect();
-
     const user = await verifyToken(req);
     if (!user) {
       return res.status(401).json({ message: 'Unauthorized' });
@@ -23,53 +20,49 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'Target user ID is required' });
     }
 
-    // Check if target user exists
-    const targetUser = await User.findById(targetUserId);
+    const [tRows] = await pool.query('SELECT * FROM users WHERE id = ?', [targetUserId]);
+    const targetUser = tRows[0];
     if (!targetUser) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const currentUser = await User.findById(user.userId);
+    const [cRows] = await pool.query('SELECT * FROM users WHERE id = ?', [user.userId]);
+    const currentUser = cRows[0];
 
-    // Check if already matched or request exists
-    const existingMatch = await Match.findOne({
-      $or: [
-        { user1: user.userId, user2: targetUserId },
-        { user1: targetUserId, user2: user.userId }
-      ]
-    });
+    const [matches] = await pool.query(`
+      SELECT * FROM matches 
+      WHERE (user1Id = ? AND user2Id = ?) OR (user1Id = ? AND user2Id = ?)
+    `, [user.userId, targetUserId, targetUserId, user.userId]);
 
-    if (existingMatch) {
+    if (matches.length > 0) {
       return res.status(400).json({ 
         message: 'Match request already exists',
-        status: existingMatch.status
+        status: matches[0].status
       });
     }
 
-    // Calculate AI match score
+    // Parse JSON
+    const currHobbies = typeof currentUser.hobbies === 'string' ? JSON.parse(currentUser.hobbies) : (currentUser.hobbies || []);
+    const targetHobbies = typeof targetUser.hobbies === 'string' ? JSON.parse(targetUser.hobbies) : (targetUser.hobbies || []);
+    currentUser.hobbies = currHobbies;
+    targetUser.hobbies = targetHobbies;
+
     const aiMatchScore = calculateAIMatchScore(currentUser, targetUser);
 
-    // Find common interests
-    const commonInterests = currentUser.hobbies.filter(hobby => 
-      targetUser.hobbies.includes(hobby)
-    );
+    const commonInterests = currHobbies.filter(hobby => targetHobbies.includes(hobby));
 
-    // Create match request
-    const match = await Match.create({
-      user1: user.userId,
-      user2: targetUserId,
-      initiatedBy: user.userId,
-      requestMessage,
-      aiMatchScore,
-      commonInterests,
-      status: 'pending'
-    });
+    const matchId = randomUUID();
 
-    // TODO: Send notification to target user
+    await pool.query(`
+      INSERT INTO matches (id, user1Id, user2Id, initiatedById, requestMessage, aiMatchScore, commonInterests, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `, [matchId, user.userId, targetUserId, user.userId, requestMessage || null, aiMatchScore, JSON.stringify(commonInterests), 'pending']);
+
+    const [newMatches] = await pool.query('SELECT * FROM matches WHERE id = ?', [matchId]);
 
     res.status(201).json({
       message: 'Match request sent successfully',
-      match
+      match: newMatches[0]
     });
   } catch (error) {
     console.error('Create match error:', error);

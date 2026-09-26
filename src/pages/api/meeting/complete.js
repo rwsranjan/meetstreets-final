@@ -1,9 +1,6 @@
- 
-import dbConnect from '../../../../lib/mongodb';
-import User from '../../../../models/User';
-import Meeting from '../../../../models/Meeting';
-import Transaction from '../../../../models/Transaction'
+import pool from '../../../../utils/mysql';
 import { verifyToken } from '../../../../utils/auth';
+import { randomUUID } from 'crypto';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -11,8 +8,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    await dbConnect();
-
     const user = await verifyToken(req);
     if (!user) {
       return res.status(401).json({ message: 'Unauthorized' });
@@ -24,97 +19,75 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'Meeting ID is required' });
     }
 
-    // Find meeting
-    const meeting = await Meeting.findById(meetingId);
-
-    if (!meeting) {
+    const [mRows] = await pool.query('SELECT * FROM meetings WHERE id = ?', [meetingId]);
+    if (mRows.length === 0) {
       return res.status(404).json({ message: 'Meeting not found' });
     }
-
-    // Verify user is a participant
-    if (!meeting.participants.map(p => p.toString()).includes(user.userId)) {
+    const meeting = mRows[0];
+    const participants = typeof meeting.participants === 'string' ? JSON.parse(meeting.participants) : meeting.participants;
+    
+    if (!participants.includes(user.userId)) {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
-    // Check if already completed
     if (meeting.completed) {
       return res.status(400).json({ message: 'Meeting already completed' });
     }
 
-    // Check if both participants have marked as complete
-    const existingRating = meeting.ratings.find(r => r.ratedBy.toString() === user.userId);
-    
-    if (existingRating) {
+    let ratings = typeof meeting.ratings === 'string' ? JSON.parse(meeting.ratings) : (meeting.ratings || []);
+    if (ratings.find(r => r.ratedById === user.userId)) {
       return res.status(400).json({ message: 'You have already completed this meeting' });
     }
 
-    // Add rating
-    const otherParticipant = meeting.participants.find(p => p.toString() !== user.userId);
-    
-    meeting.ratings.push({
-      ratedBy: user.userId,
-      ratedTo: otherParticipant,
+    const otherParticipant = participants.find(p => p !== user.userId);
+
+    ratings.push({
+      ratedById: user.userId,
+      ratedToId: otherParticipant,
       rating,
-      feedback
+      feedback,
+      createdAt: new Date().toISOString()
     });
 
-    // If both participants have rated, complete the meeting
-    if (meeting.ratings.length === 2) {
-      meeting.completed = true;
-      meeting.completedAt = new Date();
-      meeting.status = 'completed';
+    let completed = false;
+    let completedAt = null;
+    let status = meeting.status;
 
-      // Transfer coins
-      if (meeting.coinsOffered && meeting.coinsOffered.amount > 0) {
-        const offerer = await User.findById(meeting.coinsOffered.offeredBy);
-        const receiver = await User.findById(meeting.coinsAccepted.acceptedBy);
+    if (ratings.length === 2) {
+      completed = true;
+      completedAt = new Date().toISOString().slice(0, 19).replace('T', ' ');
+      status = 'completed';
 
-        // Deduct from offerer
-        offerer.coins -= meeting.coinsOffered.amount;
-        await offerer.save();
+      const coinsOffered = typeof meeting.coinsOffered === 'string' ? JSON.parse(meeting.coinsOffered) : meeting.coinsOffered;
+      const coinsAccepted = typeof meeting.coinsAccepted === 'string' ? JSON.parse(meeting.coinsAccepted) : meeting.coinsAccepted;
+      
+      if (coinsOffered && coinsOffered.amount > 0 && coinsAccepted) {
+        await pool.query('UPDATE users SET coins = coins - ? WHERE id = ?', [coinsOffered.amount, coinsOffered.offeredById]);
+        await pool.query('UPDATE users SET coins = coins + ? WHERE id = ?', [coinsOffered.amount, coinsAccepted.acceptedById]);
 
-        // Add to receiver
-        receiver.coins += meeting.coinsOffered.amount;
-        await receiver.save();
-
-        // Create transactions
-        await Transaction.create([
-          {
-            user: meeting.coinsOffered.offeredBy,
-            type: 'meet-payment',
-            amount: meeting.coinsOffered.amount,
-            coins: -meeting.coinsOffered.amount,
-            relatedMeeting: meetingId,
-            relatedUser: receiver._id,
-            status: 'completed',
-            description: `Payment for meeting with ${receiver.profileName}`
-          },
-          {
-            user: receiver._id,
-            type: 'meet-received',
-            amount: meeting.coinsOffered.amount,
-            coins: meeting.coinsOffered.amount,
-            relatedMeeting: meetingId,
-            relatedUser: meeting.coinsOffered.offeredBy,
-            status: 'completed',
-            description: `Received coins from meeting with ${offerer.profileName}`
-          }
-        ]);
-      }
-
-      // Update meet counts
-      for (const participantId of meeting.participants) {
-        await User.findByIdAndUpdate(participantId, {
-          $inc: { meetsPerMonth: 1, meetsPerYear: 1 }
-        });
+        const t1 = randomUUID();
+        const t2 = randomUUID();
+        await pool.query(`
+          INSERT INTO transactions (id, userId, type, amount, coins, relatedMeetingId, relatedUserId, status, description)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [t1, coinsOffered.offeredById, 'meet-payment', coinsOffered.amount, -coinsOffered.amount, meetingId, coinsAccepted.acceptedById, 'completed', 'Payment for meeting']);
+        
+        await pool.query(`
+          INSERT INTO transactions (id, userId, type, amount, coins, relatedMeetingId, relatedUserId, status, description)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [t2, coinsAccepted.acceptedById, 'meet-received', coinsOffered.amount, coinsOffered.amount, meetingId, coinsOffered.offeredById, 'completed', 'Received coins from meeting']);
       }
     }
 
-    await meeting.save();
+    await pool.query(`
+      UPDATE meetings SET ratings = ?, completed = ?, completedAt = ?, status = ? WHERE id = ?
+    `, [JSON.stringify(ratings), completed, completedAt, status, meetingId]);
+
+    const [updatedRows] = await pool.query('SELECT * FROM meetings WHERE id = ?', [meetingId]);
 
     res.status(200).json({
       message: 'Meeting completed successfully',
-      meeting
+      meeting: updatedRows[0]
     });
   } catch (error) {
     console.error('Complete meeting error:', error);

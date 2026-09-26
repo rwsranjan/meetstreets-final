@@ -121,7 +121,7 @@ export default function Explore() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {users.map((user) => (
-                <UserCard key={user._id} user={user} />
+                <UserCard key={user.id} user={user} />
               ))}
             </div>
           )}
@@ -141,7 +141,7 @@ function UserCard({ user }) {
   };
 
   return (
-    <Link href={`/profile/${user._id}`}>
+    <Link href={`/profile/${user.id}`}>
       <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden hover:border-orange-500/50 hover:shadow-xl hover:shadow-orange-500/10 transition-all cursor-pointer group">
         <div className="h-48 bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center relative overflow-hidden">
           {user.profilePictures?.[0] ? (

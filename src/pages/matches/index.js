@@ -108,12 +108,22 @@ export default function Matches() {
             <h2 className="text-xl font-semibold text-white mb-4">My Connections</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {matches.map((match) => (
-                <Link key={match._id} href={`/profile/${match.user._id}`}>
+                <Link key={match._id} href={`/profile/${match.user.id}`}>
                   <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden hover:border-orange-500/50 transition-all cursor-pointer">
-                    <div className="h-48 bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center">
-                      <div className="text-6xl text-white font-bold">
-                        {match.user?.profileName?.charAt(0)}
-                      </div>
+                    <div className="h-48 bg-gray-800 flex items-center justify-center relative overflow-hidden">
+                      {match.user?.profilePictures?.[0] ? (
+                        <img 
+                          src={match.user.profilePictures[0].url} 
+                          alt={match.user.profileName}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center">
+                          <div className="text-6xl text-white font-bold">
+                            {match.user?.profileName?.charAt(0)}
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <div className="p-4">
                       <h3 className="text-xl font-bold text-white mb-1">{match.user?.profileName}</h3>

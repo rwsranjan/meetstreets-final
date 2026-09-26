@@ -1,11 +1,6 @@
- 
-
-import dbConnect from '../../../../lib/mongodb';
-import Event from '../../../../models/Event';
-import Transaction from '../../../../models/Transaction';
-import User from '../../../../models/User';
+import pool from '../../../../utils/mysql';
 import { verifyToken } from '../../../../utils/auth';
-
+import { randomUUID } from 'crypto';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -13,62 +8,54 @@ export default async function handler(req, res) {
   }
 
   try {
-    await dbConnect();
     const user = await verifyToken(req);
     if (!user) return res.status(401).json({ message: 'Unauthorized' });
 
     const { eventId } = req.body;
 
-    const event = await Event.findById(eventId);
-    if (!event) {
+    const [eRows] = await pool.query('SELECT * FROM events WHERE id = ?', [eventId]);
+    if (eRows.length === 0) {
       return res.status(404).json({ message: 'Event not found' });
     }
+    const event = eRows[0];
+    const participants = typeof event.participants === 'string' ? JSON.parse(event.participants) : (event.participants || []);
 
-    // Check if already joined
-    const alreadyJoined = event.participants.some(
-      p => p.user.toString() === user.userId
-    );
-    if (alreadyJoined) {
+    if (participants.some(p => p.userId === user.userId)) {
       return res.status(400).json({ message: 'Already joined this event' });
     }
 
-    // Check max participants
-    if (event.maxParticipants && event.participants.length >= event.maxParticipants) {
+    if (event.maxParticipants && participants.length >= event.maxParticipants) {
       return res.status(400).json({ message: 'Event is full' });
     }
 
-    // Check and deduct entry coins
     if (event.entryCoins > 0) {
-      const userData = await User.findById(user.userId);
+      const [uRows] = await pool.query('SELECT coins FROM users WHERE id = ?', [user.userId]);
+      const userData = uRows[0];
+      
       if (userData.coins < event.entryCoins) {
         return res.status(400).json({ message: 'Insufficient coins' });
       }
 
-      // Deduct coins
-      userData.coins -= event.entryCoins;
-      await userData.save();
+      await pool.query('UPDATE users SET coins = coins - ? WHERE id = ?', [event.entryCoins, user.userId]);
 
-      // Create transaction
-      await Transaction.create({
-        user: user.userId,
-        type: 'meet-payment',
-        amount: event.entryCoins,
-        coins: -event.entryCoins,
-        description: `Entry fee for event: ${event.title}`,
-        status: 'completed'
-      });
+      const txId = randomUUID();
+      await pool.query(`
+        INSERT INTO transactions (id, userId, type, amount, coins, description, status)
+        VALUES (?, ?, 'meet-payment', ?, ?, ?, 'completed')
+      `, [txId, user.userId, event.entryCoins, -event.entryCoins, `Entry fee for event: ${event.title}`]);
     }
 
-    // Add participant
-    event.participants.push({
-      user: user.userId,
+    participants.push({
+      userId: user.userId,
       status: 'confirmed',
-      joinedAt: new Date()
+      joinedAt: new Date().toISOString()
     });
 
-    await event.save();
+    await pool.query('UPDATE events SET participants = ? WHERE id = ?', [JSON.stringify(participants), eventId]);
 
-    res.status(200).json({ message: 'Successfully joined event', event });
+    const [updatedRows] = await pool.query('SELECT * FROM events WHERE id = ?', [eventId]);
+
+    res.status(200).json({ message: 'Successfully joined event', event: updatedRows[0] });
   } catch (error) {
     console.error('Join event error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });

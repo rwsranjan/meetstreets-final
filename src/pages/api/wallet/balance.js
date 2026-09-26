@@ -1,5 +1,4 @@
-import dbConnect from '../../../../lib/mongodb';
-import User from '../../../../models/User';
+import pool from '../../../../utils/mysql';
 import { verifyToken } from '../../../../utils/auth';
 
 export default async function handler(req, res) {
@@ -8,11 +7,11 @@ export default async function handler(req, res) {
   }
 
   try {
-    await dbConnect();
     const user = await verifyToken(req);
     if (!user) return res.status(401).json({ message: 'Unauthorized' });
 
-    const userData = await User.findById(user.userId).select('coins welcomePoints');
+    const [rows] = await pool.query('SELECT coins, welcomePoints FROM users WHERE id = ?', [user.userId]);
+    const userData = rows[0] || { coins: 0, welcomePoints: 0 };
     
     res.status(200).json({
       coins: userData.coins || 0,
